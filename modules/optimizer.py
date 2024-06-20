@@ -17,7 +17,7 @@ class SGDOptimizer:
 
 
 class AdamOptimizer:
-    def __init__(self, params, lr = 0.01,  beta1=0.9, beta2=0.999, eps=1e-8, device = 'cpu'):
+    def __init__(self, params, lr = 0.01,  beta1=0.9, beta2=0.999, eps=1e-8):
         self.params = params
         self.lr = lr
         self.beta1 = beta1
@@ -35,3 +35,7 @@ class AdamOptimizer:
             m_hat = self.m[i] / (1 - self.beta1 ** self.t)
             v_hat = self.v[i] / (1 - self.beta2 ** self.t)
             param.data -= self.lr * m_hat / (torch.sqrt(v_hat) + self.epsilon)
+    
+    def zero_grad(self):
+        for param in self.params:
+            param.grad.data.zero_()

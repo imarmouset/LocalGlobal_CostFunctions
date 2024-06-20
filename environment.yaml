@@ -5,12 +5,13 @@ name: localglobal
   - defaults
 
 dependencies:
-  - cudatoolkit=9.0
-  - numpy=1.22.3
-  - pip=22.1.2
-  - python=3.10.4
-  - pytorch=1.12.0
-  - torchvision=0.13.0
-  - tqdm=4.64.0
+  - cudatoolkit=9.0 # TODO
+  - conda=24.5.0  #done 
+  - numpy = 1.26.4 #done
+  - pip= 24.0 #done
+  - Python 3.11.9 #done (need a 3.8-3.11 version for pytorch)
+  - pytorch= 2.2.2 #done
+  - torchvision= 0.15.2 #done
+  - tqdm=4.64.0 # not done yet 
   - pip:
-    - wandb==0.12.21
+    - wandb==0.12.21 # TODO
