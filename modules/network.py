@@ -5,7 +5,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 
-from modules.layers import HiddenLayer, OutputLayer, Flatten
+from modules.layers import HiddenLayerGlobal, OutputLayerGlobal, Flatten
+from modules.layers import Decoder, Pyr, PV
 
 
 class NeuralNetwork(nn.Module):
@@ -21,15 +22,15 @@ class NeuralNetwork(nn.Module):
 
         self.classification_layers = []
         if n_hidden_layers == 0:
-            self.classification_layers.append(OutputLayer(n_inputs, n_outputs))
+            self.classification_layers.append(OutputLayerGlobal(n_inputs, n_outputs))
         elif n_hidden_layers == 1:
-            self.classification_layers.append(HiddenLayer(n_inputs, n_hidden_units))
-            self.classification_layers.append(OutputLayer(n_hidden_units, n_outputs))
+            self.classification_layers.append(HiddenLayerGlobal(n_inputs, n_hidden_units))
+            self.classification_layers.append(OutputLayerGlobal(n_hidden_units, n_outputs))
         elif n_hidden_layers > 1:
-            self.classification_layers.append(HiddenLayer(n_inputs, n_hidden_units))
+            self.classification_layers.append(HiddenLayerGlobal(n_inputs, n_hidden_units))
             for i in range(1, n_hidden_layers):
-                self.classification_layers.append(HiddenLayer(n_hidden_units, n_hidden_units))
-            self.classification_layers.append(OutputLayer(n_hidden_units, n_outputs))
+                self.classification_layers.append(HiddenLayerGlobal(n_hidden_units, n_hidden_units))
+            self.classification_layers.append(OutputLayerGlobal(n_hidden_units, n_outputs))
 
         self.layers = nn.Sequential(*(self.feature_layers + self.classification_layers))
         self._initialise_weights() 
@@ -44,6 +45,28 @@ class NeuralNetwork(nn.Module):
 
     def loss(self, output, target):
         return F.mse_loss(output, target) 
+    
+    def MSE_loss(self, output, target): # same result than the F.mse_loss(output, target)
+        l = 0
+        for i in range(len(output)):
+            diff = (output[i] - target[i])**2
+            l += diff
+        l = float((sum(l)/len(output))/len(l))
+        return l
+    
+    def backward(self, target):
+        # Call the backward method of the output layer with target as the argument
+        burst_rate, event_rate, feedback_bp, feedback_fa = self.classification_layers[-1].backward(target)
+        # In each iteration, it calls the backward method of the current layer with the values 
+        # obtained from the previous layer's backward pass. These values are updated with 
+        # the new outputs of the current layer's backward method.
+        for i in range(len(self.classification_layers) - 2, -1, -1):
+            burst_rate, event_rate, feedback_bp, feedback_fa = self.classification_layers[i].backward(burst_rate,
+                                                                                                      event_rate,
+                                                                                                      feedback_bp,
+                                                                                                      feedback_fa)
+
+
 
 
 
@@ -64,5 +87,19 @@ class Net(nn.Module): # works
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
         return F.log_softmax(x)
+    
 
+    
+
+
+class LocalNetwork(nn.Module):
+    def __init__(self, input_dim, latent_dim, output_dim, l23_modulation_factor=0.3):
+        super().__init__()
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.latent_dim = latent_dim
+
+        self.PV = PV(input_dim, output_dim)
+        self.Pyr = Pyr(input_dim, latent_dim, output_dim, l23_modulation_factor)
+        self.decoder = Decoder(latent_dim, input_dim)
         
