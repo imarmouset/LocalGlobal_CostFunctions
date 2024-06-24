@@ -9,7 +9,7 @@ from modules.layers import HiddenLayerGlobal, OutputLayerGlobal, Flatten
 from modules.layers import Decoder, Pyr, PV
 
 
-class NeuralNetwork(nn.Module):
+class GlobalNetwork(nn.Module):
     def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_hidden_units):
         super().__init__()
         self.n_inputs = n_inputs
@@ -93,13 +93,38 @@ class Net(nn.Module): # works
 
 
 class LocalNetwork(nn.Module):
-    def __init__(self, input_dim, latent_dim, output_dim, l23_modulation_factor=0.3):
+    def __init__(self, input_dim, latent_dim, PV_modulation_factor=0.3, feedback_alignment = False):
         super().__init__()
         self.input_dim = input_dim
-        self.output_dim = output_dim
         self.latent_dim = latent_dim
-
-        self.PV = PV(input_dim, output_dim)
-        self.Pyr = Pyr(input_dim, latent_dim, output_dim, l23_modulation_factor)
-        self.decoder = Decoder(latent_dim, input_dim)
         
+        self.PV = PV(input_dim, latent_dim, feedback_alignment)
+        self.Pyr = Pyr(input_dim, latent_dim, PV_modulation_factor) 
+        self.Decoder = Decoder(latent_dim, input_dim)
+
+        self._initialise_weights() 
+    
+    def _initialise_weights(self):
+        for layer in [self.PV, self.Pyr, self.Decoder]:
+            if hasattr(layer, 'reset_parameters'):
+                layer.reset_parameters()
+
+
+    def forward(self, input1, input2):
+
+        PV_out, PV_pred = self.PV(input1) # thalamic input onto PV cells: PV output (1 layer activated) and PV predictions (2nd layer)
+        Pyr_out = self.Pyr(input2, PV_pred) # input is thalamic, and Pyr_pred is the last output of the PV layer
+        recon = self.Decoder(Pyr_out) # reconstruct the input from the Pyr_out --> used for teaching signal 
+
+        return PV_out, PV_pred, Pyr_out, recon
+
+
+    def reset_hook(self):
+        self.PV.reset_hook()
+        self.Pyr.reset_hook()
+    
+    def register_hook(self, register=True):
+        self.PV.register_hook = register
+        self.Pyr.register_hook = register
+        
+
