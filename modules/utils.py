@@ -11,9 +11,9 @@ def calculate_ssim(recon, original):
 
 def weight_update(model, optimizer, loss, recon_loss):
     optimizer.zero_grad()
-    loss.backward(retain_graph=True)
     non_decoder_grads = {}
 
+    loss.backward(retain_graph=True)
     for name, param in model.named_parameters():
         if 'Decoder' not in name:
             non_decoder_grads[name] = param.grad.clone()

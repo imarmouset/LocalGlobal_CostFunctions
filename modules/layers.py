@@ -6,66 +6,85 @@ from torch.nn.parameter import Parameter
 import math
 
 
-class OutputLayerGlobal(nn.Module):
-     def __init__(self, input_dim, output_dim):
-         super(OutputLayerGlobal, self).__init__()
-         self.input_dim = input_dim
-         self.output_dim = output_dim
-         self.weight = Parameter(torch.Tensor(output_dim, input_dim))
-         self.bias = Parameter(torch.Tensor(output_dim))
-         self.reset_parameters()
+class PyrGlobal(nn.Module):
+     def __init__(self, hidden_dim, output_dim):
+        super(PyrGlobal, self).__init__()
+        self.hidden_dim = hidden_dim # SST top_down input
+        self.output_dim=output_dim # Pyr response to output
+
+        self.fc1 = nn.Linear(hidden_dim, output_dim)
+        self.activation = nn.Sigmoid()
+
+        self.reset_parameters()
+
+        self.hook = {'fc1': []}
+        self.register_hook = False
                    
      def forward(self, input):
-         self.e = F.linear(input, self.weight, self.bias)
-         self.e = torch.sigmoid(self.e)
-         #self.e = F.softmax(self.e, dim=1)
-         return self.e
-     
-     def backward(self, input):
-         pass
+        output = self.activation(self.fc1(input))
 
-     def update_weight(self, weight):
-         pass
-   
-     def extra_repr(self):
-         return 'input_dim={}, output_dim={}'.format(
-             self.input_dim, self.output_dim)
-    
+        if self.register_hook:
+            output.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
+
+        return output
+
      def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
-        self.bias.data.uniform_(-stdv, stdv)
+        stdv = 1. / math.sqrt(self.fc1.weight.size(1))
+        self.fc1.weight.data.uniform_(-stdv, stdv)
+        self.fc1.bias.data.uniform_(-stdv, stdv)
+
+     def hook_fn(self, grad, name):
+        self.hook[name].append(grad)
+
+     def reset_hook(self):
+        self.hook = {'fc1': []}
+    
 
 
 
-class HiddenLayerGlobal(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(HiddenLayerGlobal, self).__init__()
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.weight = Parameter(torch.Tensor(output_dim, input_dim))
-        self.bias = Parameter(torch.Tensor(output_dim))
+
+class SST(nn.Module):
+    def __init__(self, input_dim, hidden_dim):
+        super(SST, self).__init__()
+        self.input_dim = input_dim # (?) input
+        self.hidden_dim = hidden_dim # sent to Pyr neurons as top-down input
+
+        self.flatten = Flatten()
+        self.fc1 = nn.Linear(input_dim, input_dim)
+        self.fc2 = nn.Linear(input_dim, input_dim)
+        self.fc3 = nn.Linear(input_dim, hidden_dim)
+        self.activation = nn.Sigmoid()
+            
+        self.hook = {'fc1': [], 'fc2': [], 'fc3': []}
+        self.register_hook = False
+
         self.reset_parameters()
 
     def forward(self, input):
-        self.e = F.linear(input, self.weight, self.bias)
-        #return torch.relu(self.e)
-        return torch.sigmoid(self.e) 
+        input = self.flatten(input)
+        fc1_out = self.activation(self.fc1(input))
+        fc2_out = self.activation(self.fc2(fc1_out))
+        top_down = self.activation(self.fc3(fc2_out))
 
-    def backward(self, input):
-        pass
+        if self.register_hook:
+            fc1_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
+            fc2_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc2'))
+            top_down.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc3'))
 
-    def update_weight(self, weight):
-        pass
+        return top_down
 
-    def extra_repr(self):
-        return 'input_dim={}, output_dim={}'.format(
-            self.input_dim, self.output_dim)
-    
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
-        self.bias.data.uniform_(-stdv, stdv)
+        for layer in [self.fc1, self.fc2, self.fc3]:
+            if type(layer) == nn.Linear:
+                stdv = 1. / math.sqrt(layer.weight.size(1))
+                layer.weight.data.uniform_(-stdv, stdv)
+                layer.bias.data.uniform_(-stdv, stdv)
+
+    def hook_fn(self, grad, name):
+        self.hook[name].append(grad)
+
+    def reset_hook(self):
+        self.hook = {'fc1': [], 'fc2': [], 'fc3': []}    
 
 
 
@@ -125,7 +144,7 @@ class PV(nn.Module):
         self.hook = {'fc1': [], 'fc2': []}       
 
 
-class Pyr(nn.Module):
+class PyrLocal(nn.Module):
     def __init__(self, input_dim, latent_dim, PV_modulation_factor=0.3):
         super().__init__()
         self.input_dim = input_dim # Thalamus input
@@ -143,7 +162,8 @@ class Pyr(nn.Module):
 
     def forward(self, input, PV_pred):
         input = self.flatten(input)
-        Pyr_out = self.activation(self.fc1(input) + self.PV_modulation_factor*PV_pred.detach())
+        Pyr_out = self.activation(self.fc1(input) + self.PV_modulation_factor*PV_pred)
+        #Pyr_out = self.activation(self.fc1(input) + self.PV_modulation_factor*PV_pred.detach())
         # detach: no gradients will be computed on PV_pred during backprop, feedback alignment to do done on PV class 
 
         if self.register_hook:
