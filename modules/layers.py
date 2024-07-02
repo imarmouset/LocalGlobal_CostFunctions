@@ -10,7 +10,7 @@ class PyrGlobal(nn.Module):
      def __init__(self, hidden_dim, output_dim):
         super(PyrGlobal, self).__init__()
         self.hidden_dim = hidden_dim # SST top_down input
-        self.output_dim=output_dim # Pyr response to output
+        self.output_dim=output_dim # Pyr classification of the image
 
         self.fc1 = nn.Linear(hidden_dim, output_dim)
         self.activation = nn.Sigmoid()
@@ -44,15 +44,15 @@ class PyrGlobal(nn.Module):
 
 
 class SST(nn.Module):
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dim, topdown_dim):
         super(SST, self).__init__()
         self.input_dim = input_dim # (?) input
-        self.hidden_dim = hidden_dim # sent to Pyr neurons as top-down input
+        self.hidden_dim = topdown_dim # sent to Pyr neurons as top-down input
 
         self.flatten = Flatten()
         self.fc1 = nn.Linear(input_dim, input_dim)
         self.fc2 = nn.Linear(input_dim, input_dim)
-        self.fc3 = nn.Linear(input_dim, hidden_dim)
+        self.fc3 = nn.Linear(input_dim, topdown_dim)
         self.activation = nn.Sigmoid()
             
         self.hook = {'fc1': [], 'fc2': [], 'fc3': []}
@@ -99,7 +99,7 @@ class Flatten(nn.Module):
 
 
 class PV(nn.Module):
-    def __init__(self, input_dim, latent_dim, feedback_alignment):
+    def __init__(self, input_dim, latent_dim, feedback_alignment = False):
         super().__init__()
         self.input_dim = input_dim # thalamic input
         self.latent_dim = latent_dim # PV prediction of Pyr cells 
@@ -201,6 +201,54 @@ class Decoder(nn.Module):
 
 
 
+class PyrCombined(nn.Module):
+    def __init__(self, thal_input_dim, latent_dim, topdown_dim, output_dim, PV_modulation_factor=0.3):
+        super().__init__()
+        self.thal_input_dim = thal_input_dim # Thalamus input to PV and Pyr
+        self.latent_dim=latent_dim # Dim of PV prediction of Pyr cells; of output of fc1; of Pyramidal output
+        self.topdown_dim = topdown_dim # SST output (top_down) input to Pyr neurons
+        self.output_dim=output_dim # Pyr classification of the image      
+        self.PV_modulation_factor = PV_modulation_factor # How much the PV prediction modulates the Pyr output
+
+        self.activation = nn.Sigmoid()
+        self.flatten = Flatten()
+        self.fc1 = nn.Linear(topdown_dim, thal_input_dim)
+        self.fc2 = nn.Linear(thal_input_dim, latent_dim)
+        self.fc3 = nn.Linear(latent_dim, output_dim)
+
+        self.reset_parameters()
+
+        self.hook = {'fc1': [], 'fc2': [], 'fc3': []}
+        self.register_hook = False
+
+    def forward(self, input_thal, PV_pred, top_down):
+        # 1 - Top-down inputs into apical dendrites
+        td_processed = self.activation(self.fc1(top_down))
+        # 2 - Thalamic inputs into basal dendrites, sumed to the top-down processed
+        input_thal = self.flatten(input_thal)
+        td_thal_processed = self.activation(self.fc2(input_thal + td_processed))
+        # 3 - PV_pred input into basal dendrites, sumed to thalamic and top-down inputs
+        PV_input = self.PV_modulation_factor * PV_pred
+        Pyr_out = self.activation(self.fc3(td_thal_processed + PV_input))
+
+        if self.register_hook:
+            td_processed.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
+            td_thal_processed.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc2'))
+            Pyr_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc3'))
+
+        # returns a classification of the image 
+        return Pyr_out
+
+    def reset_parameters(self):
+        pass 
+
+    def hook_fn(self, grad, name):
+        self.hook[name].append(grad)
+
+    def reset_hook(self):
+        self.hook = {'fc1': [], 'fc2': [], 'fc3': []}
+
+
 
 class LinearFunctionFA(torch.autograd.Function):
     # Taken from neoSSL shallow_mlp.py
@@ -257,3 +305,9 @@ class LinearFA(nn.Module):
 
     def forward(self, input):
         return LinearFunctionFA.apply(input, self.weight, self.bias, self.backward_weight, self.weight_masks)
+
+
+
+
+
+
