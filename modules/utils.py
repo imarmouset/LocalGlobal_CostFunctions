@@ -26,10 +26,22 @@ def weight_update(model, optimizer, loss, recon_loss):
     
     optimizer.step()
 
-def loss_local(loss_fn, PV_out, PV_pred, Pyr_out, recon, inputPV, inputPyr, pred_coeff):
-    inputs2 = inputs2.view(-1, 784)
+def loss_local(loss_fn, PV_pred, Pyr_out, recon, inputPyr, pred_coeff):
+    inputPyr = inputPyr.view(-1, 784)
     pred_loss = loss_fn(Pyr_out, PV_pred)
     recon_loss = loss_fn(recon, inputPyr)
     loss = pred_coeff * pred_loss + recon_loss
     return loss, pred_loss, recon_loss
+
+
+def loss_combined(loss_fn, t, PV_pred, Pyr_out, recon, inputPyr):
+    pred_coeff = 1
+    inputPyr = inputPyr.view(-1, 784)
+    # pred_loss = loss_fn(Pyr_out, PV_pred)
+    pred_loss = 0
+    recon_loss = loss_fn(recon, inputPyr)
+    SSLloss = pred_coeff * pred_loss + recon_loss
+    global_loss = loss_fn(Pyr_out, t)
+    total_loss = global_loss + SSLloss
+    return total_loss, global_loss, pred_loss, recon_loss
 

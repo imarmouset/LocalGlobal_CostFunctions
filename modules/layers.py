@@ -122,7 +122,7 @@ class PV(nn.Module):
     def forward(self, input):
         input = self.flatten(input)
         PV_out  = self.activation(self.fc1(input))
-        PV_pred = self.fc2(PV_out)
+        PV_pred = self.activation(self.fc2(PV_out))
 
         if self.register_hook:
             PV_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
