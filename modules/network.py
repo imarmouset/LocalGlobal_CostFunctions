@@ -108,10 +108,10 @@ class CombinedNetwork(nn.Module):
     def forward(self, inputSST, inputPV, inputPyr):
         top_down = self.SST(inputSST) 
         PV_out, PV_pred = self.PV(inputPV)
-        Pyr_out = self.Pyr(inputPyr, PV_pred, top_down)
+        Pyr_pred, Pyr_out = self.Pyr(inputPyr, PV_pred, top_down)
         recon = self.Decoder(Pyr_out) 
 
-        return top_down, PV_out, PV_pred, Pyr_out, recon
+        return top_down, PV_out, PV_pred, Pyr_pred, Pyr_out, recon
 
 
 

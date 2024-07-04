@@ -214,7 +214,8 @@ class PyrCombined(nn.Module):
         self.flatten = Flatten()
         self.fc1 = nn.Linear(topdown_dim, thal_input_dim)
         self.fc2 = nn.Linear(thal_input_dim, latent_dim)
-        self.fc3 = nn.Linear(latent_dim, output_dim)
+        self.fc3 = nn.Linear(latent_dim, latent_dim)
+        self.fc4 = nn.Linear(latent_dim, output_dim)
 
         self.reset_parameters()
 
@@ -229,7 +230,9 @@ class PyrCombined(nn.Module):
         td_thal_processed = self.activation(self.fc2(input_thal + td_processed))
         # 3 - PV_pred input into basal dendrites, sumed to thalamic and top-down inputs
         PV_input = self.PV_modulation_factor * PV_pred
-        Pyr_out = self.activation(self.fc3(td_thal_processed + PV_input))
+        Pyr_pred = self.activation(self.fc3(td_thal_processed + PV_input))
+        # 4 - Classification layer: Pyr_out is 10-dim and classifies the input received
+        Pyr_out = self.activation(self.fc4(Pyr_pred))
 
         if self.register_hook:
             td_processed.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
@@ -237,7 +240,7 @@ class PyrCombined(nn.Module):
             Pyr_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc3'))
 
         # returns a classification of the image 
-        return Pyr_out
+        return Pyr_pred, Pyr_out
 
     def reset_parameters(self):
         pass 
