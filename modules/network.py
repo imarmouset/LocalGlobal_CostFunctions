@@ -14,14 +14,14 @@ from modules.layers import PV, SST
 class PV_SST_Pyr(nn.Module):
     # Network recaptitulating the PV autoencoder modalities + SST top-down modulation
 
-    def __init__(self, thal_input_dim, SST_input_dim, encoded_dim, output_dim=10):
+    def __init__(self, thal_input_dim, SST_input_dim, latent_dim, output_dim=10):
         super().__init__()
         self.thal_input_dim = thal_input_dim
         self.SST_input_dim = SST_input_dim
-        self.encoded_dim = encoded_dim
+        self.latent_dim = latent_dim
         self.output_dim = output_dim
 
-        self.PV = PV(thal_input_dim, encoded_dim)
+        self.PV = PV(thal_input_dim, latent_dim)
         self.SST = SST(SST_input_dim, output_dim)
 
         self.initialise_weights()

@@ -11,13 +11,13 @@ import math
 class PV(nn.Module):
     # Autoencoder
 
-    def __init__(self, input_dim, encoded_dim):
+    def __init__(self, input_dim, latent_dim):
         super().__init__()
         self.input_dim = input_dim
-        self.encoded_dim = encoded_dim
+        self.latent_dim = latent_dim
 
-        self.Thal2PV = Thal2PV(input_dim, encoded_dim) # encoder
-        self.PV2Pyr = PV2Pyr(encoded_dim, input_dim) # decoder
+        self.Thal2PV = Thal2PV(input_dim, latent_dim) # encoder
+        self.PV2Pyr = PV2Pyr(latent_dim, input_dim) # decoder
 
         self.reset_parameters()
 
@@ -89,16 +89,16 @@ class SST(nn.Module):
 class Thal2PV(nn.Module):
     # Encoder part of the autoencoder
 
-    def __init__(self, input_dim, encoded_dim):
+    def __init__(self, input_dim, latent_dim):
         super().__init__()
         self.input_dim = input_dim
-        self.encoded_dim = encoded_dim
+        self.latent_dim = latent_dim
 
         self.flatten = Flatten()
         self.activation = nn.Sigmoid()
         self.fc1 = nn.Linear(input_dim, 128)
         self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, encoded_dim)
+        self.fc3 = nn.Linear(64, latent_dim)
 
         self.hook = {'fc1': [], 'fc2': [], 'fc3': []}
         self.register_hook = False
@@ -134,17 +134,16 @@ class Thal2PV(nn.Module):
 
 
 
-
 class PV2Pyr(nn.Module):
     # Decoder part of the autoencoder
 
-    def __init__(self, encoded_dim, decoded_dim):
+    def __init__(self, latent_dim, decoded_dim):
         super().__init__()
-        self.encoded_dim = encoded_dim
+        self.latent_dim = latent_dim
         self.decoded_dim = decoded_dim
 
         self.activation = nn.Sigmoid()
-        self.fc1 = nn.Linear(encoded_dim, 64)
+        self.fc1 = nn.Linear(latent_dim, 64)
         self.fc2 = nn.Linear(64, 128)
         self.fc3 = nn.Linear(128, decoded_dim)
 
