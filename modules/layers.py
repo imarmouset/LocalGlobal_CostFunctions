@@ -8,67 +8,32 @@ import math
 
 
 
-class PV(nn.Module):
-    # Autoencoder
-
-    def __init__(self, input_dim, latent_dim):
-        super().__init__()
-        self.input_dim = input_dim
-        self.latent_dim = latent_dim
-
-        self.Thal2PV = Thal2PV(input_dim, latent_dim) # encoder
-        self.PV2Pyr = PV2Pyr(latent_dim, input_dim) # decoder
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        for layer in [self.Thal2PV, self.PV2Pyr]:
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
-
-    def forward(self, input):
-        encoded = self.Thal2PV(input)
-        decoded = self.PV2Pyr(encoded)
-        # decoded.view(-1, 1, 28, 28)
-
-        return encoded, decoded
-
-
-class SST(nn.Module):
+class classifier(nn.Module):
     # Simple classifier for a global loss computation
 
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, latent_dim, output_dim):
         super().__init__()
-        self.SST_input_dim = input_dim
+        self.latent_dim = latent_dim
         self.output_dim = output_dim
 
-        self.fc1 = nn.Linear(input_dim, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, output_dim)
-        self.flatten = Flatten()
+        self.fc1 = nn.Linear(latent_dim, output_dim)
         self.activation = nn.Sigmoid()
 
-        self.hook = {'fc1': [], 'fc2': [], 'fc3': []}
+        self.hook = {'fc1': []}
         self.register_hook = False
 
         self.reset_parameters()
 
-
     def forward(self, input):
-        input = self.flatten(input)
-        fc1_out = self.activation(self.fc1(input))
-        fc2_out = self.activation(self.fc2(fc1_out))
-        output = self.fc3(fc2_out)
+        output = self.activation(self.fc1(input)) 
 
         if self.register_hook:
-            fc1_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
-            fc2_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc2'))
-            output.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc3'))
+            output.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
 
         return output
 
     def reset_parameters(self):
-        for layer in [self.fc1, self.fc2, self.fc3]:
+        for layer in [self.fc1]:
             if type(layer) == nn.Linear:
                 stdv = 1. / math.sqrt(layer.weight.size(1))
                 layer.weight.data.uniform_(-stdv, stdv)
@@ -78,7 +43,7 @@ class SST(nn.Module):
         self.hook[name].append(grad)
 
     def reset_hook(self):
-        self.hook = {'fc1': [], 'fc2': [], 'fc3': []} 
+        self.hook = {'fc1': []} 
 
 
 
@@ -86,8 +51,7 @@ class SST(nn.Module):
 
 
 
-class Thal2PV(nn.Module):
-    # Encoder part of the autoencoder
+class encoder(nn.Module):
 
     def __init__(self, input_dim, latent_dim):
         super().__init__()
@@ -134,8 +98,7 @@ class Thal2PV(nn.Module):
 
 
 
-class PV2Pyr(nn.Module):
-    # Decoder part of the autoencoder
+class decoder(nn.Module):
 
     def __init__(self, latent_dim, decoded_dim):
         super().__init__()
@@ -143,11 +106,10 @@ class PV2Pyr(nn.Module):
         self.decoded_dim = decoded_dim
 
         self.activation = nn.Sigmoid()
-        self.fc1 = nn.Linear(latent_dim, 64)
-        self.fc2 = nn.Linear(64, 128)
-        self.fc3 = nn.Linear(128, decoded_dim)
+        self.fc1 = nn.Linear(latent_dim, 128)
+        self.fc2 = nn.Linear(128, decoded_dim)
 
-        self.hook = {'fc1': [], 'fc2': [], 'fc3': []}
+        self.hook = {'fc1': [], 'fc2': []}
         self.register_hook = False
 
         self.reset_parameters()
@@ -155,18 +117,16 @@ class PV2Pyr(nn.Module):
 
     def forward(self, input):
         fc1_out = self.activation(self.fc1(input))
-        fc2_out = self.activation(self.fc2(fc1_out))
-        decoded = self.activation(self.fc3(fc2_out))
+        decoded = self.activation(self.fc2(fc1_out))
 
         if self.register_hook:
             fc1_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
-            fc2_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc2'))
-            decoded.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc3'))
+            decoded.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc2'))
 
         return decoded
 
     def reset_parameters(self):
-        for layer in [self.fc1, self.fc2, self.fc3]:
+        for layer in [self.fc1, self.fc2]:
             if type(layer) == nn.Linear:
                 stdv = 1. / math.sqrt(layer.weight.size(1))
                 layer.weight.data.uniform_(-stdv, stdv)
@@ -176,7 +136,7 @@ class PV2Pyr(nn.Module):
         self.hook[name].append(grad)
 
     def reset_hook(self):
-        self.hook = {'fc1': [], 'fc2': [], 'fc3': []} 
+        self.hook = {'fc1': [], 'fc2': []} 
 
 
 
