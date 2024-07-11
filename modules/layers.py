@@ -60,11 +60,10 @@ class encoder(nn.Module):
 
         self.flatten = Flatten()
         self.activation = nn.Sigmoid()
-        self.fc1 = nn.Linear(input_dim, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, latent_dim)
+        self.fc1 = nn.Linear(input_dim, latent_dim)
+        #self.fc2 = nn.Linear(64, latent_dim)
 
-        self.hook = {'fc1': [], 'fc2': [], 'fc3': []}
+        self.hook = {'fc1': []}
         self.register_hook = False
 
         self.reset_parameters()
@@ -72,19 +71,15 @@ class encoder(nn.Module):
 
     def forward(self, input):
         input = self.flatten(input)
-        fc1_out = self.activation(self.fc1(input))
-        fc2_out = self.activation(self.fc2(fc1_out))
-        encoded = self.activation(self.fc3(fc2_out))
+        encoded = self.activation(self.fc1(input))
 
         if self.register_hook:
-            fc1_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
-            fc2_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc2'))
-            encoded.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc3'))
+            encoded.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
 
         return encoded
 
     def reset_parameters(self):
-        for layer in [self.fc1, self.fc2, self.fc3]:
+        for layer in [self.fc1]:
             if type(layer) == nn.Linear:
                 stdv = 1. / math.sqrt(layer.weight.size(1))
                 layer.weight.data.uniform_(-stdv, stdv)
@@ -94,7 +89,7 @@ class encoder(nn.Module):
         self.hook[name].append(grad)
 
     def reset_hook(self):
-        self.hook = {'fc1': [], 'fc2': [], 'fc3': []} 
+        self.hook = {'fc1': []} 
 
 
 
