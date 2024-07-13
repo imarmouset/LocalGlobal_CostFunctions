@@ -6,10 +6,10 @@ import matplotlib.pyplot as plt
 
 
 def compute_losses(recon, thal_input, output, t, loss_fn, alpha):
-    #recon_loss = loss_fn(recon, thal_input.view(thal_input.size(0), -1)) 
-    recon_loss = loss_fn(recon, recon)
+    recon_loss = loss_fn(recon, thal_input.view(thal_input.size(0), -1)) 
     global_loss = loss_fn(output, t)
-    total_loss = alpha*recon_loss + (1 - alpha)*global_loss
+    #total_loss = alpha*recon_loss + (1 - alpha)*global_loss
+    total_loss = loss_fn(output, output)
 
     return recon_loss, global_loss, total_loss
 
