@@ -61,7 +61,8 @@ class encoder(nn.Module):
         self.flatten = Flatten()
         self.activation = nn.Sigmoid()
         self.fc1 = nn.Linear(input_dim, latent_dim)
-        #self.fc2 = nn.Linear(64, latent_dim)
+        #self.fc2 = nn.Linear(128, 64)
+        #self.fc3 = nn.Linear(64, latent_dim)
 
         self.hook = {'fc1': []}
         self.register_hook = False
@@ -71,10 +72,14 @@ class encoder(nn.Module):
 
     def forward(self, input):
         input = self.flatten(input)
+        #fc1_out = self.activation(self.fc1(input))
+        #fc2_out = self.activation(self.fc2(fc1_out))
         encoded = self.activation(self.fc1(input))
 
         if self.register_hook:
             encoded.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc1'))
+            #fc2_out.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc2'))
+            #encoded.register_hook(lambda grad: self.hook_fn(grad=grad,name='fc3'))
 
         return encoded
 
@@ -101,8 +106,8 @@ class decoder(nn.Module):
         self.decoded_dim = decoded_dim
 
         self.activation = nn.Sigmoid()
-        self.fc1 = nn.Linear(latent_dim, 128)
-        self.fc2 = nn.Linear(128, decoded_dim)
+        self.fc1 = nn.Linear(latent_dim, 64)
+        self.fc2 = nn.Linear(64, decoded_dim)
 
         self.hook = {'fc1': [], 'fc2': []}
         self.register_hook = False
