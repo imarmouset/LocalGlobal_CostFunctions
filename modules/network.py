@@ -15,12 +15,13 @@ class PV_SST_Pyr(nn.Module):
     # Network recaptitulating the PV autoencoder modalities 
 
     def __init__(self, thal_input_dim, latent_dim, output_dim=10, 
-                 freeze=None, defreeze=None, swap_digits=None):
+                 freeze=None, defreeze=None, swap_digits=None, mix_signals=None):
         super().__init__()
         self.thal_input_dim = thal_input_dim
         self.latent_dim = latent_dim
         self.output_dim = output_dim
         self.swap_digits = swap_digits
+        self.mix_signals = mix_signals
 
         self.encoder = encoder(thal_input_dim, latent_dim)
         self.decoder = decoder(latent_dim, thal_input_dim)
@@ -29,7 +30,7 @@ class PV_SST_Pyr(nn.Module):
         if freeze is not None:
             self.freeze_module(freeze)
         if defreeze is not None:
-            self.defreeze_module(defreeze)
+            self.unfreeze_module(defreeze)
 
         self.initialise_weights()
 
@@ -48,7 +49,7 @@ class PV_SST_Pyr(nn.Module):
         if module_name in ['encoder', 'decoder', 'classifier']:
             for param in getattr(self, module_name).parameters():
                 param.requires_grad = False
-            print(f"{module_name} has been frozen.")
+            #print(f"{module_name} has been frozen.")
         else:
             raise ValueError(f"Invalid module name: {module_name}. "
                              f"Must be 'encoder', 'decoder', or 'classifier'.")
@@ -57,7 +58,7 @@ class PV_SST_Pyr(nn.Module):
         if module_name in ['encoder', 'decoder', 'classifier']:
             for param in getattr(self, module_name).parameters():
                 param.requires_grad = True
-            print(f"{module_name} has been unfrozen.")
+            #print(f"{module_name} has been unfrozen.")
         else:
             raise ValueError(f"Invalid module name: {module_name}. "
                              f"Must be 'encoder', 'decoder', or 'classifier'.")
