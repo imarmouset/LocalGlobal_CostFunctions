@@ -11,14 +11,18 @@ import torch.nn as nn
 
 def compute_losses(recon, thal_input, output, t, loss_fn, alpha):
     recon_loss = loss_fn(recon, thal_input.view(thal_input.size(0), -1)) 
-    global_loss = loss_fn(output, t)
+    #global_loss = loss_fn(output, t)
+    global_loss = loss_fn(output, output) #--> to null the loss for experiments
     total_loss = alpha*recon_loss + (1 - alpha)*global_loss
-    #total_loss = loss_fn(output, output) --> to null the loss
+    
 
     return recon_loss, global_loss, total_loss
 
 
 def weight_update(model, optimizer, recon_loss, global_loss, total_loss):
+    # Total loss for encoder
+    # Recon loss for decoder
+    # Global loss for classifier
 
     # Updating encoder weights with total_loss (combination weighted of recon_loss and global_loss)
     total_loss.backward(retain_graph=True)
@@ -38,11 +42,59 @@ def weight_update(model, optimizer, recon_loss, global_loss, total_loss):
     # Restore encoder and decoder gradients (from total and recon losses respectively)
     for param, grad in zip(model.encoder.parameters(), encoder_grads):
         param.grad = grad
+        #param.grad = None # for frozen encoder experiment because trouble when module.freeze = 'encoder'
     for param, grad in zip(model.decoder.parameters(), decoder_grads):
         param.grad = grad
 
 
 
+def weight_update_v1(model, optimizer, recon_loss, global_loss, total_loss):
+    # Total loss for encoder
+    # Recon loss for decoder
+    # Global loss for classifier
+    # For forzen encoder
+
+    # Updating encoder weights with total_loss (combination weighted of recon_loss and global_loss)
+    if model.encoder.parameters().__next__().requires_grad:
+        total_loss.backward(retain_graph=True)
+        encoder_grads = [param.grad.clone() if param.grad is not None else None 
+                    for param in model.encoder.parameters()]
+        optimizer.zero_grad()
+    else : 
+        encoder_grads = None
+
+    # Updating decoder weights with recon_loss
+    if model.decoder.parameters().__next__().requires_grad:
+        recon_loss.backward(retain_graph=True)
+        decoder_grads = [param.grad.clone() if param.grad is not None else None 
+                    for param in model.decoder.parameters()]
+        optimizer.zero_grad()
+    else:
+        decoder_grads = None
+        
+
+    # Updating classifier weights with global_loss
+    if model.classifier.parameters().__next__().requires_grad:
+        if global_loss.requires_grad:
+            global_loss.backward(retain_graph=True)
+            classifier_grads = [param.grad.clone() if param.grad is not None else None
+                    for param in model.classifier.parameters()]
+            optimizer.zero_grad()
+        else : 
+            classifier_grads = None
+    else:
+        classifier_grads = None
+
+
+    # Restore encoder and decoder gradients (from total and recon losses respectively)
+    for param, grad in zip(model.encoder.parameters(), encoder_grads):
+        param.grad = grad
+    for param, grad in zip(model.decoder.parameters(), decoder_grads):
+        param.grad = grad
+    for param, grad in zip(model.classifier.parameters(), classifier_grads):
+        param.grad = grad
+
+ 
 
 
 def print_grad_norms(model, name):
