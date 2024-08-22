@@ -108,31 +108,20 @@ def swap_digits(model, target, recon, thal_input, output, loss_fn, alpha):
     digit_x, digit_y = model.swap_digits
     mask_x = (target == digit_x)
     mask_y = (target == digit_y)
-    #print(f"Number of digit {digit_x}: {mask_x.sum()}; number of digit {digit_y}: 
-    # {mask_y.sum()}; should be {mask_y.sum() + mask_x.sum()} modifications") 
 
     # Swapping of digit X and digit Y
     target_swapped = target.clone()
     target_swapped[mask_x] = digit_y
     target_swapped[mask_y] = digit_x
 
-    #print(f"Number of differences t vs t_swapped: {(target != target_swapped).sum()} ")
-
     t_swapped = F.one_hot(target_swapped, num_classes=10).float()
-    #t = t = F.one_hot(target, num_classes=10).float()
+
 
     # Compute loss with swapped target (for classification task only because only supervised learning)
     recon_loss = loss_fn(recon, thal_input.view(thal_input.size(0), -1))
     global_loss = loss_fn(output, t_swapped)
     total_loss = alpha*recon_loss + (1 - alpha)*global_loss
-
-    #global_loss_no_swap = loss_fn(output, t)
-    #total_loss_no_swap = alpha*recon_loss + (1 - alpha)*global_loss_no_swap
-
-    #print(f"No-swapped global loss - Swapped global loss: {global_loss_no_swap} - {global_loss}")
-    #print(f"No-swapped total loss - Swapped total loss: {total_loss_no_swap} - {total_loss} \n")
     
-
     return recon_loss, global_loss, total_loss
 
 
@@ -143,7 +132,7 @@ def compute_scale_factor(current_epoch, swap_epoch, min_scale=0.05, decay_rate=0
 
 
 
-def scaled_backard(model, scale_factor):
+def scaled_backward(model, scale_factor):
     for param in model.parameters():
         if param.grad is not None:
             param.grad *= scale_factor

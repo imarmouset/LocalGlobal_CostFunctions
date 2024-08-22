@@ -17,64 +17,25 @@ def calculate_ssim(recon, original):
 
 
 
-def calculate_accuracy(targets, outputs, total, correct):
-        _, predicted = outputs.max(1)
+def calculate_accuracy(targets, output, total, correct):
+        _, predicted = output.max(1)
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
         return total, correct, 100 * correct / total
 
 
 
-
-def acc_swapped(output, target, swap_argument):
-    digit_x, digit_y = swap_argument
-    _, predicted = torch.max(output.data, 1)
-    correct = (predicted == target).float()
-    
-    mask_x = (target == digit_x)
-    mask_y = (target == digit_y)
-    mask_other = ~(mask_x | mask_y)
-    
-    accuracy_x = correct[mask_x].mean().item() if mask_x.any() else 0
-    accuracy_y = correct[mask_y].mean().item() if mask_y.any() else 0
-    accuracy_other = correct[mask_other].mean().item() if mask_other.any() else 0
-    
-    return (accuracy_x, accuracy_y, accuracy_other)
-
-
-
-
-class AccuracyTracker:
-    def __init__(self, swap_argument):
-        self.digit_x, self.digit_y = swap_argument
-        self.correct_x = 0
-        self.correct_y = 0
-        self.correct_other = 0
-        self.total_x = 0
-        self.total_y = 0
-        self.total_other = 0
-
-    def update(self, output, target):
-        _, predicted = torch.max(output.data, 1)
-        correct = (predicted == target)
-        
-        mask_x = (target == self.digit_x)
-        mask_y = (target == self.digit_y)
-        mask_other = ~(mask_x | mask_y)
-
-        self.correct_x += correct[mask_x].sum().item()
-        self.correct_y += correct[mask_y].sum().item()
-        self.correct_other += correct[mask_other].sum().item()
-
-        self.total_x += mask_x.sum().item()
-        self.total_y += mask_y.sum().item()
-        self.total_other += mask_other.sum().item()
-
-    def get_accuracies(self):
-        acc_x = self.correct_x / self.total_x if self.total_x > 0 else 0
-        acc_y = self.correct_y / self.total_y if self.total_y > 0 else 0
-        acc_other = self.correct_other / self.total_other if self.total_other > 0 else 0
-        return (acc_x, acc_y, acc_other)
+def calculate_multiple_accuracy(targets, output, total, correct):
+    _, predicted = output.max(1)
+    # Iterate through the targets and predictions
+    for digit in range(10):
+        # Create a mask for the current digit
+        mask = (targets == digit)
+        # Update total count for the current digit
+        total[digit] += mask.sum().item()
+        # Update correct count for the current digit
+        correct[digit] += (predicted[mask] == targets[mask]).sum().item()
+    # don't forget to compute the actual accuracy at the end of the epoch! 
 
 
 
