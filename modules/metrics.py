@@ -6,6 +6,8 @@ import torch
 import torch.nn as nn
 from skimage.metrics import structural_similarity as ssim
 from sklearn.metrics import silhouette_score
+from sklearn.metrics import normalized_mutual_info_score
+from sklearn.cluster import KMeans
 
 
 def calculate_ssim(recon, original):
@@ -36,6 +38,39 @@ def calculate_multiple_accuracy(targets, output, total, correct):
         # Update correct count for the current digit
         correct[digit] += (predicted[mask] == targets[mask]).sum().item()
     # don't forget to compute the actual accuracy at the end of the epoch! 
+
+
+
+
+def init_class_trackers():
+    return {
+        'total_x': 0,
+        'total_y': 0,
+        'x_class_as_y': 0,
+        'y_class_as_x': 0
+    }
+
+def update_class_trackers(trackers, model, target, output):
+    if model.swap_digits:
+        digit_x, digit_y = model.swap_digits
+    elif model.mix_signals:
+        digit_x, digit_y = model.mix_signals
+    _, predicted = output.max(1)
+    
+    mask_x = (target == digit_x)
+    trackers['total_x'] += mask_x.sum().item()
+    trackers['x_class_as_y'] += ((predicted == digit_y) & mask_x).sum().item()
+    
+    mask_y = (target == digit_y)
+    trackers['total_y'] += mask_y.sum().item()
+    trackers['y_class_as_x'] += ((predicted == digit_x) & mask_y).sum().item()
+
+
+def calculate_class_percentages(trackers):
+    x_class_as_y_percent = (trackers['x_class_as_y'] / trackers['total_x']) * 100 if trackers['total_x'] > 0 else 0
+    y_class_as_x_percent = (trackers['y_class_as_x'] / trackers['total_y']) * 100 if trackers['total_y'] > 0 else 0
+    return x_class_as_y_percent, y_class_as_x_percent
+
 
 
 
@@ -207,3 +242,30 @@ def tsne_and_clustering(encoded_outputs, labels, epoch=None):
     plt.close()
     
     return silhouette
+
+
+
+
+
+def calculate_nmi(encoded_outputs, labels, n_clusters=10):
+    """
+    Calculate Normalized Mutual Information (NMI) score for encoded outputs.
+    
+    Args:
+    encoded_outputs (np.array): Array of encoded outputs from the model
+    labels (np.array): Array of true labels
+    n_clusters (int): Number of clusters for K-means (default: 10 for MNIST)
+    
+    Returns:
+    float: NMI score
+    """
+    # Ensure inputs are numpy arrays
+    encoded_outputs = np.array(encoded_outputs)
+    labels = np.array(labels)
+    
+    # Perform K-means clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42,  n_init=10)
+    predicted_clusters = kmeans.fit_predict(encoded_outputs)
+    
+    # Calculate and return NMI score
+    return normalized_mutual_info_score(labels, predicted_clusters)

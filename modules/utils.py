@@ -73,27 +73,45 @@ def successive_learning(epoch, model):
 
 
 def mix_error_signals(model, target, t, recon, thal_input, output, alpha):
-    # Digits to mix, their outputs & targets
+    # Digits to mix (i.e exchange), their outputs after model pass & targets
     digit_x, digit_y = model.mix_signals
-    mask_x, mask_y = (target == digit_x), (target == digit_y)
+    mask_x = (target == digit_x)
+    mask_y = (target == digit_y)
     num_mixs = min(mask_x.sum(), mask_y.sum())
-    output_x, output_y = output[mask_x], output[mask_y]
-    target_x, target_y = t[mask_x], t[mask_y]
+    print("num_mixs: ", num_mixs)
+    output_x = output[mask_x]
+    output_y = output[mask_y]
+    target_x = target[mask_x]
+    target_y = target[mask_y] 
+    t_x = F.one_hot(target_x, num_classes=10).float()
+    t_y = F.one_hot(target_y, num_classes=10).float()
 
     # Compute loss of digits_x and digits_y seperately before mixing
     loss_fn = nn.MSELoss(reduction='none')
-    loss_x = loss_fn(output_x, target_x)
-    loss_y = loss_fn(output_y, target_y)
-    swapped_loss_x = loss_y[:num_mixs]
-    swapped_loss_y = loss_x[:num_mixs]
-    final_loss_x = torch.cat([swapped_loss_x, loss_x[num_mixs:]])
-    final_loss_y = torch.cat([swapped_loss_y, loss_y[num_mixs:]])
+    loss_x = loss_fn(output_x, t_x)
+    #print("len loss x:", len(loss_x), "loss_x: ", loss_x) OK
+    loss_y = loss_fn(output_y, t_y)
+    #print("len loss y:", len(loss_y),"loss_y: ", loss_y) OK
+    mixed_loss_x = loss_y[:num_mixs]
+    # check that mixed_loss_x is loss_y
+    #print("len mixed_loss_x:", len(mixed_loss_x), "mixed_loss_x: ", mixed_loss_x) OK
+    mixed_loss_y = loss_x[:num_mixs]
+    # check that mixed_loss_y is loss_x
+    #print("len mixed_loss_y:", len(mixed_loss_y), "mixed_loss_y: ", mixed_loss_y) OK
+    final_loss_x = torch.cat([mixed_loss_x, loss_x[num_mixs:]])
+    #print("len final_loss_x:", len(final_loss_x), "VS number of x", mask_x.sum()) OK
+    final_loss_y = torch.cat([mixed_loss_y, loss_y[num_mixs:]])
+    #print("len final_loss_y:", len(final_loss_y), " VS number of y", mask_y.sum()) OK 
   
     # Computing the rest of the global loss and inserting the mixed losses
-    global_loss = loss_fn(output, t)
+    global_loss_without_mix = loss_fn(output, t)
+    global_loss = global_loss_without_mix.clone()
     global_loss[mask_x] = final_loss_x
     global_loss[mask_y] = final_loss_y
     global_loss = global_loss.mean()
+    global_loss_without_mix = global_loss_without_mix.mean()
+    # print ("global_loss_without_mix : ", global_loss_without_mix, "VS global_loss : ", global_loss) 
+    # print ("global loss without mix - global loss : ", global_loss_without_mix - global_loss) # seems like theres a diff
 
     # Compute the other losses normaly 
     recon_loss = loss_fn(recon, thal_input.view(thal_input.size(0), -1)).mean()
